@@ -32,13 +32,11 @@
  * @author : Paulo Cesar Libreros <paucelibre@gmail.com>
  */
 #include "process_button.h"
-#include "main.h"
-#include "cmsis_os.h"
-#include "logger.h"
+#include "process_ui.h"
 
-#include "ao_app.h"
-
-#define BUTTON_DELAY_MS		10
+#define STACK_SIZE_MINIM		(configMINIMAL_STACK_SIZE * 2)
+#define PROCESS_BUTTON_PRIORITY (3U)
+#define BUTTON_DELAY_MS			10
 
 typedef enum {
 	FSM_BUTTON_DELAY,
@@ -48,18 +46,55 @@ typedef enum {
 	FSM_BUTTON_INIT
 } _state_button;
 
-static _state_button stateButton = FSM_BUTTON_INIT;
-static const TickType_t period 	 = pdMS_TO_TICKS(BUTTON_DELAY_MS);
+static TaskHandle_t htask_button				= NULL;
+static const char* name_task_button	 			= (const char*)("task_button");
+
+static _state_button stateButton;
+static const TickType_t period 	 				= pdMS_TO_TICKS(BUTTON_DELAY_MS);
 static TickType_t lastWakeTime;
 static TickType_t startTime;
 static TickType_t endTime;
 
+static void task_button(void * pvParameters);
 
 static void fsm_button_init(void);
 static void fsm_button_delay(void);
 static void fsm_button_save_time(void);
 static void fsm_button_wait_ms(void);
-static void fsm_button_calc_and_send(ao_t * ao);
+static void fsm_button_calc_and_send(void);
+
+static void fsm_button_run(void);
+
+/*------------------------------------------------ PUBLIC METHODS ------------------------------------------------*/
+
+void process_button_init(void){
+
+	stateButton 	= FSM_BUTTON_INIT;
+	lastWakeTime	= 0;
+	startTime		= 0;
+	endTime			= 0;
+
+	BaseType_t res = xTaskCreate(
+						task_button,
+						name_task_button,
+						STACK_SIZE_MINIM,
+						NULL,
+						PROCESS_BUTTON_PRIORITY,
+						&htask_button
+					 );
+
+	configASSERT(pdPASS == res);
+}
+
+/*------------------------------------------------ PRIVATE METHODS ------------------------------------------------*/
+static void task_button(void * pvParameters){
+
+	LOGGER_INFO("[%s] Init.", name_task_button);
+
+	for(;;){
+		fsm_button_run();
+	}
+}
 
 static void fsm_button_init(void){
 
@@ -97,38 +132,34 @@ static void fsm_button_wait_ms(void){
 	}
 }
 
-static void fsm_button_calc_and_send(ao_t * ao){
+static void fsm_button_calc_and_send(void){
 
 	uint32_t *time_elapsed = (uint32_t *)pvPortMalloc(sizeof(uint32_t));
 
 	if (time_elapsed == NULL) {
-		LOGGER_INFO("[%s] Memory allocation failed.", ao->param_task.name_task);
+		LOGGER_INFO("[%s] Memory allocation failed.", name_task_button);
 	    return;
 	}
 
 	*time_elapsed = (uint32_t)(endTime - startTime);
 
-	if(!ao_send_queue(ao->hqueue1, &time_elapsed)){
-		LOGGER_INFO("[%s] Queue not sent.", ao->param_task.name_task);
-		vPortFree(time_elapsed);
-	}else {LOGGER_INFO("[%s] Queue sent ok.", ao->param_task.name_task)};
+	if(!ao_ui_send_queue(&time_elapsed)){
+		LOGGER_INFO("[%s] Queue not sent.", name_task_button);
+	}else {LOGGER_INFO("[%s] Queue sent ok.", name_task_button)};
+
+	vPortFree(time_elapsed);
 
 	stateButton = FSM_BUTTON_DELAY;
 }
 
-void fsm_button_run(void * param){
-
-
-	if(param == NULL) return;
-
-	ao_t *ao = (ao_t*)(param);
+void fsm_button_run(void){
 
 	switch(stateButton){
 		case FSM_BUTTON_INIT:			fsm_button_init();				break;
 		case FSM_BUTTON_DELAY:			fsm_button_delay();				break;
 		case FSM_BUTTON_SAVE_TIME:		fsm_button_save_time();			break;
 		case FSM_BUTTON_WAIT_MS:		fsm_button_wait_ms();			break;
-		case FSM_BUTTON_CALC_AND_SEND:	fsm_button_calc_and_send(ao);	break;
+		case FSM_BUTTON_CALC_AND_SEND:	fsm_button_calc_and_send();		break;
 		default: 						stateButton = FSM_BUTTON_INIT;  break;
 	}
 

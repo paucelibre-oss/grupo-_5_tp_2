@@ -31,8 +31,8 @@
  *
  * @author : Paulo Cesar Libreros <paucelibre@gmail.com>
  */
-#ifndef INC_AO_APP_H_
-#define INC_AO_APP_H_
+#ifndef INC_PROCESS_LED_B_H_
+#define INC_PROCESS_LED_B_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,41 +41,17 @@ extern "C" {
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+
 #include "main.h"
 #include "cmsis_os.h"
 #include "logger.h"
 
-/*Defines*/
-typedef void (*process_handler_t)(void * param);
 
-typedef struct {
-	TaskFunction_t 		task;
-	const char			*name_task;
-	uint16_t			stack_size;
-	void				*parameters;
-	UBaseType_t			priority;
-	TaskHandle_t		id_task;
-} paramsTask_t;
-
-typedef struct {
-	QueueHandle_t		hqueue1;	/*Queue for button*/
-	QueueHandle_t		hqueue2;	/*Queue for led red*/
-	QueueHandle_t		hqueue3;	/*Queue for led green*/
-	QueueHandle_t		hqueue4;	/*Queue for led blue*/
-	uint16_t			GPIO_led;
-	GPIO_TypeDef 		*GPIO_Port;
-	uint8_t				state;
-	process_handler_t	process_handler;
-	paramsTask_t		param_task;
-} ao_t;
-
-
-void ao_init(ao_t * ao, process_handler_t process);
-bool ao_send_queue(QueueHandle_t queue, void * msg);
-bool ao_receive_queue(QueueHandle_t queue, void * msg);
+void process_led_b_init(void);
+bool ao_ledb_send_queue(void *msg);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /*INC_AO_APP_H_*/
+#endif /* INC_PROCESS_LED_B_H_ */

@@ -32,133 +32,115 @@
  * @author : Paulo Cesar Libreros <paucelibre@gmail.com>
  */
 #include "process_ui.h"
-#include "main.h"
-#include "cmsis_os.h"
-#include "logger.h"
 
-#include "ao_app.h"
-#include "process_led.h"
+#include "process_led_r.h"
+#include "process_led_g.h"
+#include "process_led_b.h"
+#include "led_state.h"
 
-typedef enum {
-	FSM_UI_RECEIVE_TIME,
-	FSM_UI_SEND_QUEUE_RED,
-	FSM_UI_SEND_QUEUE_GREEN,
-	FSM_UI_SEND_QUEUE_BLUE
-} _state_ui;
+#define STACK_SIZE_MINIM	(configMINIMAL_STACK_SIZE * 2)
+#define PROCESS_UI_PRIORITY (4U)
 
-typedef enum {
-	STATE_LED_RED,
-	STATE_LED_GREEN,
-	STATE_LED_BULE,
+static TaskHandle_t htask_ui				= NULL;
+static QueueHandle_t hqueue_ao_ui 			= NULL;
+static const UBaseType_t queue_length_ui 	= 10;
+static const UBaseType_t queue_item_size_ui = sizeof(uint32_t);
+static const char* name_task_ui 			= (const char*)("task_ui");
 
-	NUM_LEDS
-} _leds;
+static void task_ui(void * pvParameters);
+static void fsm_run(uint32_t *time_value);
+static void fsm_ui_send_queues(state_led_t red, state_led_t green, state_led_t blue);
 
-static _state_ui stateUi = FSM_UI_RECEIVE_TIME;
+/*------------------------------------------------ PUBLIC METHODS ------------------------------------------------*/
+void process_ui_init(void){
 
-static void fsm_ui_receive_time(ao_t * ao);
-static void fsm_ui_send_queue_red(ao_t * ao);
-static void fsm_ui_send_queue_green(ao_t * ao);
-static void fsm_ui_send_queue_blue(ao_t * ao);
-static void send_queues(ao_t * ao, state_led_t red, state_led_t green, state_led_t blue);
+	hqueue_ao_ui = xQueueCreate(queue_length_ui, queue_item_size_ui);
+	configASSERT(hqueue_ao_ui != NULL);
 
-static void fsm_ui_receive_time(ao_t * ao){
-
-	if(ao->hqueue1 == NULL) return;
-
-	uint32_t* timeB = NULL;
-
-	if(ao_receive_queue(ao->hqueue1, &timeB)){
-		LOGGER_INFO("[%s] Queue receive value: %lums.", ao->param_task.name_task, *timeB);
-		if((*timeB > 200U) && (*timeB <= 1000U))
-			stateUi = FSM_UI_SEND_QUEUE_RED;
-		else if((*timeB > 1000U) && (*timeB <= 2000U))
-			stateUi = FSM_UI_SEND_QUEUE_GREEN;
-		else if(*timeB > 2000U)
-			stateUi = FSM_UI_SEND_QUEUE_BLUE;
-	}else{
-		vPortFree(timeB);
-	}
+	BaseType_t res = xTaskCreate(
+						task_ui,
+						name_task_ui,
+						STACK_SIZE_MINIM,
+						NULL,
+						PROCESS_UI_PRIORITY,
+						&htask_ui
+					 );
+	configASSERT(pdPASS == res);
 }
 
-static void fsm_ui_send_queue_red(ao_t * ao){
+bool ao_ui_send_queue(void *msg){
 
-	send_queues(ao, LED_ON, LED_OFF, LED_OFF);
-	stateUi = FSM_UI_RECEIVE_TIME;
+	if(hqueue_ao_ui == NULL || msg == NULL) return false;
+
+	return xQueueSend(hqueue_ao_ui, msg, 0) == pdPASS;
 }
 
-static void fsm_ui_send_queue_green(ao_t * ao){
+/*------------------------------------------------ PRIVATE METHODS ------------------------------------------------*/
 
-	send_queues(ao, LED_OFF, LED_ON, LED_OFF);
-	stateUi = FSM_UI_RECEIVE_TIME;
-}
+static void task_ui(void * pvParameters){
 
-static void fsm_ui_send_queue_blue(ao_t * ao){
+	LOGGER_INFO("[%s] Init.", name_task_ui);
 
-	send_queues(ao, LED_OFF, LED_OFF, LED_ON);
-	stateUi = FSM_UI_RECEIVE_TIME;
-}
+	for(;;){
 
-static void send_queues(ao_t * ao, state_led_t red, state_led_t green, state_led_t blue){
+		uint32_t *time_elapsed = (uint32_t *)pvPortMalloc(sizeof(uint32_t));
 
-	if(ao->hqueue2 == NULL) return;
-	if(ao->hqueue3 == NULL) return;
-	if(ao->hqueue4 == NULL) return;
-
-	state_led_t *led_state_red = (state_led_t *) pvPortMalloc(sizeof(state_led_t));
-	state_led_t *led_state_green = (state_led_t *) pvPortMalloc(sizeof(state_led_t));
-	state_led_t *led_state_blue = (state_led_t *) pvPortMalloc(sizeof(state_led_t));
-
-	if(led_state_red != NULL){
-		*led_state_red = red;
-		if(!ao_send_queue(ao->hqueue2, &led_state_red)){
-			vPortFree(led_state_red);
-			LOGGER_INFO("[%s] Queue RED not sent.", ao->param_task.name_task);
-		}else{
-			LOGGER_INFO("[%s] Queue RED sent.", ao->param_task.name_task)
+		if (time_elapsed == NULL) {
+			LOGGER_INFO("[%s] Memory allocation failed.", name_task_ui);
+		}else if(xQueueReceive(hqueue_ao_ui, &time_elapsed, portMAX_DELAY) == pdPASS){
+			fsm_run(time_elapsed);
 		}
-	}else{
-		LOGGER_INFO("[%s] Unable to reserve dynamic memory to send RED LED status.", ao->param_task.name_task);
-	}
 
-	if(led_state_green != NULL){
-		*led_state_green = green;
-		if(!ao_send_queue(ao->hqueue3, &led_state_green)){
-			vPortFree(led_state_green);
-			LOGGER_INFO("[%s] Queue GREEN not sent.", ao->param_task.name_task);
-		}else{
-			LOGGER_INFO("[%s] Queue GREEN sent.", ao->param_task.name_task)
-		}
-	}else{
-		LOGGER_INFO("[%s] Unable to reserve dynamic memory to send GREEN LED status.", ao->param_task.name_task);
-	}
-
-	if(led_state_blue != NULL){
-		*led_state_blue = blue;
-		if(!ao_send_queue(ao->hqueue4, &led_state_blue)){
-			vPortFree(led_state_blue);
-			LOGGER_INFO("[%s] Queue BLUE not sent.", ao->param_task.name_task);
-		}else{
-			LOGGER_INFO("[%s] Queue BLUE sent.", ao->param_task.name_task)
-		}
-	}else{
-		LOGGER_INFO("[%s] Unable to reserve dynamic memory to send BLUE LED status.", ao->param_task.name_task);
+		vPortFree(time_elapsed);
 	}
 }
 
-void fsm_ui_run(void * param){
+static void fsm_run(uint32_t *time_value){
 
-	if(param == NULL) return;
-
-	ao_t *ao = (ao_t*)(param);
-
-	switch(stateUi){
-		case FSM_UI_RECEIVE_TIME:		fsm_ui_receive_time(ao); 			break;
-		case FSM_UI_SEND_QUEUE_RED:		fsm_ui_send_queue_red(ao);			break;
-		case FSM_UI_SEND_QUEUE_GREEN:	fsm_ui_send_queue_green(ao);		break;
-		case FSM_UI_SEND_QUEUE_BLUE:	fsm_ui_send_queue_blue(ao);			break;
-		default: 							stateUi = FSM_UI_RECEIVE_TIME;	break;
-	}
+	if((*time_value > 200U) && (*time_value <= 1000U))
+		fsm_ui_send_queues(LED_ON, LED_OFF, LED_OFF);
+	else if((*time_value > 1000U) && (*time_value <= 2000U))
+		fsm_ui_send_queues(LED_OFF, LED_ON, LED_OFF);
+	else if(*time_value > 2000U)
+		fsm_ui_send_queues(LED_OFF, LED_OFF, LED_ON);
 }
 
+static void fsm_ui_send_queues(state_led_t red, state_led_t green, state_led_t blue){
 
+	state_led_t *led_red 	= (state_led_t*)pvPortMalloc(sizeof(state_led_t));
+	state_led_t *led_green 	= (state_led_t*)pvPortMalloc(sizeof(state_led_t));
+	state_led_t *led_blue 	= (state_led_t*)pvPortMalloc(sizeof(state_led_t));
+
+	if(led_red == NULL || led_green == NULL || led_blue == NULL){
+		LOGGER_INFO("[%s] Unable to reserve dynamic memory to send LEDs status.", name_task_ui);
+		vPortFree(led_red);
+		vPortFree(led_green);
+		vPortFree(led_blue);
+		return;
+	}
+
+	*led_red 	= red;
+	*led_green 	= green;
+	*led_blue 	= blue;
+
+	if(!ao_ledr_send_queue(&led_red)){
+		vPortFree(led_red);
+		LOGGER_INFO("[%s] Queue RED not sent.", name_task_ui);
+	}else{
+		LOGGER_INFO("[%s] Queue RED sent.", name_task_ui);
+	}
+
+	if(!ao_ledg_send_queue(&led_green)){
+		vPortFree(led_green);
+		LOGGER_INFO("[%s] Queue GREEN not sent.", name_task_ui);
+	}else{
+		LOGGER_INFO("[%s] Queue GREEN sent.", name_task_ui);
+	}
+
+	if(!ao_ledb_send_queue(&led_blue)){
+		vPortFree(led_blue);
+		LOGGER_INFO("[%s] Queue BLUE not sent.", name_task_ui);
+	}else{
+		LOGGER_INFO("[%s] Queue BLUE sent.", name_task_ui);
+	}
+}

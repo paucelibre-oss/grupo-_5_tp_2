@@ -31,7 +31,6 @@
  *
  * @author : Paulo Cesar Libreros <paucelibre@gmail.com>
  */
-
 #ifndef INC_PROCESS_UI_H_
 #define INC_PROCESS_UI_H_
 
@@ -43,11 +42,15 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
-void fsm_ui_run(void * param);
+#include "main.h"
+#include "cmsis_os.h"
+#include "logger.h"
+
+void process_ui_init(void);
+bool ao_ui_send_queue(void *msg);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* INC_PROCESS_UI_H_ */
-

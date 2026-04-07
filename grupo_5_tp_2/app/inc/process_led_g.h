@@ -31,30 +31,27 @@
  *
  * @author : Paulo Cesar Libreros <paucelibre@gmail.com>
  */
-/*--------------- Includes ---------------*/
-#include "task_app.h"
+#ifndef INC_PROCESS_LED_G_H_
+#define INC_PROCESS_LED_G_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "main.h"
 #include "cmsis_os.h"
-#include "ao_app.h"
 #include "logger.h"
-/*--------------- defines ---------------*/
 
-void generic_task(void * pvParameters){
+void process_led_g_init(void);
+bool ao_ledg_send_queue(void *msg);
 
-	if(pvParameters == NULL){
-		LOGGER_INFO("[generic_task] The parameters are null.");
-		vTaskSuspend(NULL);
-	}
 
-	ao_t *ao = (ao_t*)(pvParameters);
-
-	LOGGER_INFO("[%s] Init.", ao->param_task.name_task);
-
-	for(;;){
-		ao->process_handler(ao);
-	}
+#ifdef __cplusplus
 }
+#endif
 
-
-
-
+#endif /* INC_PROCESS_LED_G_H_ */

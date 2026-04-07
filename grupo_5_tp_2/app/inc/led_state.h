@@ -31,8 +31,8 @@
  *
  * @author : Paulo Cesar Libreros <paucelibre@gmail.com>
  */
-#ifndef INC_TASK_APP_H_
-#define INC_TASK_APP_H_
+#ifndef INC_LED_STATE_H_
+#define INC_LED_STATE_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,11 +42,21 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
-void generic_task(void * pvParameters);
+/*LED Hardware Pins*/
+#define LED_GPIO_Port 		GPIOA
+#define LED_GREEN_GPIO		10U
+#define LED_RED_GPIO		11U
+#define LED_BLUE_GPIO		12U
+
+
+
+typedef uint32_t state_led_t;
+
+#define LED_ON	((state_led_t)(1U))
+#define LED_OFF ((state_led_t)(0U))
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /*INC_TASK_APP_H_*/
-
+#endif /* INC_LED_STATE_H_ */

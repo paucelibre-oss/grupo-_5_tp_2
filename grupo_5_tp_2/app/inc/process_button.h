@@ -31,7 +31,6 @@
  *
  * @author : Paulo Cesar Libreros <paucelibre@gmail.com>
  */
-
 #ifndef INC_PROCESS_BUTTON_H_
 #define INC_PROCESS_BUTTON_H_
 
@@ -43,7 +42,11 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
-void fsm_button_run(void * param);
+#include "main.h"
+#include "cmsis_os.h"
+#include "logger.h"
+
+void process_button_init(void);
 
 #ifdef __cplusplus
 }

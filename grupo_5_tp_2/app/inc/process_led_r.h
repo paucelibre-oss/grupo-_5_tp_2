@@ -31,9 +31,8 @@
  *
  * @author : Paulo Cesar Libreros <paucelibre@gmail.com>
  */
-
-#ifndef INC_PROCESS_LED_H_
-#define INC_PROCESS_LED_H_
+#ifndef INC_PROCESS_LED_R_H_
+#define INC_PROCESS_LED_R_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,21 +42,16 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
-/*LED Hardware Pins*/
-#define LED_GREEN_GPIO		10U
-#define LED_RED_GPIO		11U
-#define LED_BLUE_GPIO		12U
+#include "main.h"
+#include "cmsis_os.h"
+#include "logger.h"
 
-typedef uint32_t state_led_t;
-
-#define LED_ON	((state_led_t)(1U))
-#define LED_OFF ((state_led_t)(0U))
-
-void fsm_led_run(void * param);
+void process_led_r_init(void);
+bool ao_ledr_send_queue(void *msg);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* INC_PROCESS_LED_H_ */
+#endif /* INC_PROCESS_LED_R_H_ */
 
