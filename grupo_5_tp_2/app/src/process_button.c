@@ -134,7 +134,9 @@ static void fsm_button_wait_ms(void){
 
 static void fsm_button_calc_and_send(void){
 
-	uint32_t *time_elapsed = (uint32_t *)pvPortMalloc(sizeof(uint32_t));
+	/*----- ----- -----  OLD  CODE  ----- ----- -----*/
+
+	/*uint32_t *time_elapsed = (uint32_t *)pvPortMalloc(sizeof(uint32_t));
 
 	if (time_elapsed == NULL) {
 		LOGGER_INFO("[%s] Memory allocation failed.", name_task_button);
@@ -148,6 +150,26 @@ static void fsm_button_calc_and_send(void){
 	}else {LOGGER_INFO("[%s] Queue sent ok.", name_task_button)};
 
 	vPortFree(time_elapsed);
+
+	stateButton = FSM_BUTTON_DELAY;*/
+	/*----- ----- ----- ----- ----- ----- ----- -----*/
+	uint32_t *time_elapsed = NULL;
+
+	time_elapsed = (uint32_t *)pvPortMalloc(sizeof(uint32_t));
+
+	if (time_elapsed == NULL) {
+		LOGGER_INFO("[%s] Memory allocation failed.", name_task_button);
+	    return;
+	}
+
+	*time_elapsed = (uint32_t)(endTime - startTime);
+
+	if(!ao_ui_send_queue(&time_elapsed)){
+		vPortFree(time_elapsed);
+		time_elapsed = NULL;
+		LOGGER_INFO("[%s] Queue not sent.", name_task_button);
+	}else {LOGGER_INFO("[%s] Queue sent ok.", name_task_button)};
+
 
 	stateButton = FSM_BUTTON_DELAY;
 }

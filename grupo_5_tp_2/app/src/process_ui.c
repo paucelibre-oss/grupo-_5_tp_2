@@ -41,6 +41,14 @@
 #define STACK_SIZE_MINIM	(configMINIMAL_STACK_SIZE * 2)
 #define PROCESS_UI_PRIORITY (4U)
 
+typedef enum {
+	LED_POINTER_STATUS_RED,
+	LED_POINTER_STATUS_GREEN,
+	LED_POINTER_STATUS_BLUE,
+
+	LED_POINTER_STATUS_COUNTER
+} _pointers_enum;
+
 static TaskHandle_t htask_ui				= NULL;
 static QueueHandle_t hqueue_ao_ui 			= NULL;
 static const UBaseType_t queue_length_ui 	= 10;
@@ -79,7 +87,8 @@ bool ao_ui_send_queue(void *msg){
 
 static void task_ui(void * pvParameters){
 
-	LOGGER_INFO("[%s] Init.", name_task_ui);
+	/*----- ----- -----  OLD  CODE  ----- ----- -----*/
+	/*LOGGER_INFO("[%s] Init.", name_task_ui);
 
 	for(;;){
 
@@ -92,6 +101,20 @@ static void task_ui(void * pvParameters){
 		}
 
 		vPortFree(time_elapsed);
+	}*/
+	/*----- ----- ----- ----- ----- ----- ----- -----*/
+	uint32_t *time_elapsed = NULL;
+	LOGGER_INFO("[%s] Init.", name_task_ui);
+
+	for(;;){
+		if(xQueueReceive(hqueue_ao_ui, &time_elapsed, portMAX_DELAY) == pdPASS){
+			LOGGER_INFO("[%s] time received: %lu ms.", name_task_ui, (*time_elapsed));
+			fsm_run(time_elapsed);
+			vPortFree(time_elapsed);
+			time_elapsed = NULL;
+		}
+
+
 	}
 }
 
@@ -107,7 +130,8 @@ static void fsm_run(uint32_t *time_value){
 
 static void fsm_ui_send_queues(state_led_t red, state_led_t green, state_led_t blue){
 
-	state_led_t *led_red 	= (state_led_t*)pvPortMalloc(sizeof(state_led_t));
+	/*----- ----- -----  OLD  CODE  ----- ----- -----*/
+	/*state_led_t *led_red 	= (state_led_t*)pvPortMalloc(sizeof(state_led_t));
 	state_led_t *led_green 	= (state_led_t*)pvPortMalloc(sizeof(state_led_t));
 	state_led_t *led_blue 	= (state_led_t*)pvPortMalloc(sizeof(state_led_t));
 
@@ -139,6 +163,55 @@ static void fsm_ui_send_queues(state_led_t red, state_led_t green, state_led_t b
 
 	if(!ao_ledb_send_queue(&led_blue)){
 		vPortFree(led_blue);
+		LOGGER_INFO("[%s] Queue BLUE not sent.", name_task_ui);
+	}else{
+		LOGGER_INFO("[%s] Queue BLUE sent.", name_task_ui);
+	}*/
+	/*----- ----- ----- ----- ----- ----- ----- -----*/
+
+	state_led_t *pointers_leds[LED_POINTER_STATUS_COUNTER] = {NULL};
+	state_led_t state_leds[LED_POINTER_STATUS_COUNTER] = {red, green, blue};
+	bool error_pointer = false;
+
+	for(uint8_t elements = 0; elements < LED_POINTER_STATUS_COUNTER; elements++){
+		pointers_leds[elements] = (state_led_t*)pvPortMalloc(sizeof(state_led_t));
+		if(pointers_leds[elements] == NULL){
+			LOGGER_INFO("[%s] Unable to reserve dynamic memory to send LEDs status.", name_task_ui);
+			error_pointer = true;
+			break;
+		}
+
+		*pointers_leds[elements] = state_leds[elements];
+	}
+
+	if(error_pointer){
+		for(uint8_t elements = 0; elements < LED_POINTER_STATUS_COUNTER; elements++){
+			if(pointers_leds[elements] != NULL){
+				vPortFree(pointers_leds[elements]);
+			}
+		}
+		return;
+	}
+
+	if(!ao_ledr_send_queue(&pointers_leds[LED_POINTER_STATUS_RED])){
+		vPortFree(pointers_leds[LED_POINTER_STATUS_RED]);
+		pointers_leds[LED_POINTER_STATUS_RED] = NULL;
+		LOGGER_INFO("[%s] Queue RED not sent.", name_task_ui);
+	}else{
+		LOGGER_INFO("[%s] Queue RED sent.", name_task_ui);
+	}
+
+	if(!ao_ledg_send_queue(&pointers_leds[LED_POINTER_STATUS_GREEN])){
+		vPortFree(pointers_leds[LED_POINTER_STATUS_GREEN]);
+		pointers_leds[LED_POINTER_STATUS_GREEN] = NULL;
+		LOGGER_INFO("[%s] Queue GREEN not sent.", name_task_ui);
+	}else{
+		LOGGER_INFO("[%s] Queue GREEN sent.", name_task_ui);
+	}
+
+	if(!ao_ledb_send_queue(&pointers_leds[LED_POINTER_STATUS_BLUE])){
+		vPortFree(pointers_leds[LED_POINTER_STATUS_BLUE]);
+		pointers_leds[LED_POINTER_STATUS_BLUE] = NULL;
 		LOGGER_INFO("[%s] Queue BLUE not sent.", name_task_ui);
 	}else{
 		LOGGER_INFO("[%s] Queue BLUE sent.", name_task_ui);

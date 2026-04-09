@@ -74,7 +74,8 @@ bool ao_ledb_send_queue(void *msg){
 /*------------------------------------------------ PRIVATE METHODS ------------------------------------------------*/
 static void task_ledb(void * pvParameters){
 
-	LOGGER_INFO("[%s] Init.", name_task_ledb);
+	/*----- ----- -----  OLD  CODE  ----- ----- -----*/
+	/*LOGGER_INFO("[%s] Init.", name_task_ledb);
 
 	for(;;){
 		state_led_t *state_led = (state_led_t *)pvPortMalloc(sizeof(state_led_t));
@@ -85,7 +86,18 @@ static void task_ledb(void * pvParameters){
 		}
 
 		vPortFree(state_led);
-	}
+	}*/
+	/*----- ----- ----- ----- ----- ----- ----- -----*/
+	state_led_t *state_led = NULL;
+	LOGGER_INFO("[%s] Init.", name_task_ledb);
+
+		for(;;){
+			if(xQueueReceive(hqueue_ao_led_blue, &state_led, portMAX_DELAY) == pdPASS){
+				fsm_run(state_led);
+				vPortFree(state_led);
+				state_led = NULL;
+			}
+		}
 }
 
 static void fsm_run(state_led_t *st_led){

@@ -54,4 +54,3 @@ bool ao_ledr_send_queue(void *msg);
 #endif
 
 #endif /* INC_PROCESS_LED_R_H_ */
-
